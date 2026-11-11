@@ -26,11 +26,22 @@
     li button:hover { background: #e9d5ff; }
     #empty { text-align: center; margin: 25px 0 0; }
     footer { margin-top: 18px; color: #7c6399; font-size: .9rem; }
+    .profiles{background:#f3e8ff;border:1px solid #e9d5ff;border-radius:14px;padding:14px;margin:15px 0 22px}
+    .profiles label{display:block;margin-bottom:8px;color:#6b21a8}
+    .profiles select{width:100%;padding:11px;border:1px solid #d8b4fe;border-radius:9px;background:white;color:#352052;font:inherit;margin-bottom:10px}
+    .profiles form{flex-wrap:wrap}.profiles small{color:#795b93;line-height:1.4}
   </style>
 </head>
 <body>
   <main>
     <h1>✅ Mi lista de tareas</h1>
+    <section class="profiles">
+      <label for="user-select"><strong>👤 Usuario activo</strong></label>
+      <select id="user-select" aria-label="Seleccionar usuario"></select>
+      <form id="user-form"><input id="user-name" type="text" maxlength="30" required placeholder="Nombre del nuevo usuario"><button type="submit">Crear usuario</button></form>
+      <p id="user-message" role="status" style="margin:8px 0;font-size:.85rem"></p>
+      <small>Perfiles locales: sin contraseña ni sincronización entre dispositivos.</small>
+    </section>
     <p>Organiza tus pendientes de forma sencilla.</p>
     <form id="task-form">
       <input id="task-input" type="text" placeholder="Escribe una tarea..." maxlength="150" required aria-label="Nueva tarea">
@@ -42,23 +53,43 @@
     <p style="margin:18px 0 0;text-align:center"><a href="./calculadora.html" style="color:#7e22ce;font-weight:600">🧮 Abrir calculadora científica</a></p>
   </main>
   <script>
-    const STORAGE_KEY = "prueba_todo_tasks";
+    const LEGACY_KEY = "prueba_todo_tasks";
+    const USERS_KEY = "prueba_todo_users";
+    const ACTIVE_KEY = "prueba_todo_active_user";
+    const selectUser = document.getElementById("user-select");
+    const userForm = document.getElementById("user-form");
+    const userName = document.getElementById("user-name");
+    const userMessage = document.getElementById("user-message");
+    function readJSON(key,fallback){try {const value=JSON.parse(localStorage.getItem(key));return value===null?fallback:value;}catch{return fallback;}}
+    let users=readJSON(USERS_KEY,[]);
+    if(!Array.isArray(users))users=[];
+    users=users.filter(u=>u&&typeof u.id==="string"&&typeof u.name==="string");
+    if(!users.length)users=[{id:"default",name:"Principal"}];
+    let activeUser=localStorage.getItem(ACTIVE_KEY);
+    if(!users.some(u=>u.id===activeUser))activeUser=users[0].id;
+    function userTasksKey(){return activeUser==="default"?LEGACY_KEY:"prueba_todo_tasks_"+activeUser;}
+    function loadTasks(){const stored=readJSON(userTasksKey(),[]);return Array.isArray(stored)?stored.filter(t=>t&&typeof t.text==="string"&&typeof t.done==="boolean"):[];}
+    function persistUsers(){try{localStorage.setItem(USERS_KEY,JSON.stringify(users));localStorage.setItem(ACTIVE_KEY,activeUser);}catch{}}
+    function renderUsers(){selectUser.replaceChildren();users.forEach(u=>{const opt=document.createElement("option");opt.value=u.id;opt.textContent=u.name;selectUser.append(opt);});selectUser.value=activeUser;}
+    persistUsers();renderUsers();
+    selectUser.addEventListener("change",()=>{activeUser=selectUser.value;persistUsers();tasks=loadTasks();render();});
+    userForm.addEventListener("submit",event=>{
+      event.preventDefault();const name=userName.value.trim();if(!name)return;
+      if(users.some(u=>u.name.toLocaleLowerCase()===name.toLocaleLowerCase())){userMessage.textContent="Ese nombre ya existe.";return;}
+      const id="u_"+(crypto.randomUUID?crypto.randomUUID():Date.now().toString(36)+Math.random().toString(36).slice(2));
+      users.push({id,name});activeUser=id;persistUsers();renderUsers();tasks=loadTasks();render();userName.value="";
+      userMessage.textContent="Usuario creado: "+name;
+    });
     const form = document.getElementById("task-form");
     const input = document.getElementById("task-input");
     const list = document.getElementById("task-list");
     const empty = document.getElementById("empty");
     const counter = document.getElementById("counter");
 
-    let tasks;
-    try {
-      const stored = JSON.parse(localStorage.getItem(STORAGE_KEY));
-      tasks = Array.isArray(stored) ? stored.filter(t => t && typeof t.text === "string" && typeof t.done === "boolean") : [];
-    } catch {
-      tasks = [];
-    }
+    let tasks = loadTasks();
 
     function save() {
-      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks)); }
+      try { localStorage.setItem(userTasksKey(), JSON.stringify(tasks)); }
       catch { /* La página sigue funcionando aunque el navegador no permita guardar. */ }
     }
 
