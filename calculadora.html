@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Calculadora científica morada</title>
+<style>
+*{box-sizing:border-box}
+:root{font-family:system-ui,-apple-system,Segoe UI,sans-serif;color:#392152}
+body{min-height:100vh;margin:0;padding:24px 12px;display:grid;place-items:center;background:linear-gradient(135deg,#e9d5ff,#f5f0ff 52%,#c4b5fd)}
+.calculadora{width:min(100%,440px);background:#fffaff;border:1px solid #e9d5ff;border-radius:24px;padding:22px;box-shadow:0 18px 52px #6b21a833}
+h1{font-size:1.45rem;color:#6b21a8;margin:0 0 5px}
+.subtitle{color:#8767a0;font-size:.9rem;margin:0 0 20px}
+.screen{background:#f3e8ff;border:1px solid #e9d5ff;border-radius:15px;padding:16px;min-height:114px;text-align:right;overflow:hidden}
+#expression{font-size:1.1rem;min-height:28px;overflow-x:auto;white-space:nowrap;color:#7e22ce}
+#result{font-size:2.2rem;font-weight:700;overflow-wrap:anywhere;margin-top:4px}
+.toolbar{display:flex;justify-content:space-between;align-items:center;margin:14px 0 10px;gap:10px}
+.mode{border:1px solid #d8b4fe;background:#f3e8ff;color:#6b21a8;padding:8px 13px;border-radius:10px;font-weight:700;cursor:pointer}
+.hint{font-size:.78rem;color:#8767a0;text-align:right}
+.keys{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}
+button{font:inherit}
+.key{min-height:53px;padding:5px 0;border:0;border-radius:12px;background:#f3e8ff;color:#54247c;font-size:1.08rem;font-weight:600;cursor:pointer;transition:background .15s,transform .1s}
+.key:active{transform:scale(.96)}
+.key:hover{background:#e9d5ff}
+.key.number{background:#faf5ff}
+.key.operator{background:#e9d5ff;color:#6b21a8}
+.key.action{background:#ddd6fe}
+.key.equal{background:#7e22ce;color:#fff}
+.key.equal:hover{background:#6b21a8}
+footer{margin-top:17px;text-align:center;font-size:.82rem;color:#8767a0}
+a{color:#7e22ce}
+@media(max-width:360px){.calculadora{padding:13px}.keys{gap:5px}.key{min-height:48px;font-size:.98rem}}
+</style>
+</head>
+<body>
+<main class="calculadora">
+<h1>🔮 Calculadora científica</h1>
+<p class="subtitle">Calcula de forma fácil con estilo morado.</p>
+<div class="screen" role="status" aria-live="polite">
+<div id="expression" aria-label="Operación">0</div>
+<div id="result" aria-label="Resultado">0</div>
+</div>
+<div class="toolbar">
+<button id="mode" class="mode" type="button" title="Cambiar entre grados y radianes">DEG</button>
+<span class="hint">DEG: grados · RAD: radianes</span>
+</div>
+<div class="keys" id="keys">
+<button class="key action" data-v="AC">AC</button><button class="key action" data-v="DEL">⌫</button><button class="key operator" data-v="(">(</button><button class="key operator" data-v=")">)</button><button class="key operator" data-v="/">÷</button>
+<button class="key" data-v="sin(">sin</button><button class="key" data-v="cos(">cos</button><button class="key" data-v="tan(">tan</button><button class="key" data-v="^">xʸ</button><button class="key operator" data-v="*">×</button>
+<button class="key" data-v="asin(">asin</button><button class="key" data-v="acos(">acos</button><button class="key" data-v="atan(">atan</button><button class="key" data-v="sqrt(">√</button><button class="key operator" data-v="-">−</button>
+<button class="key" data-v="log(">log</button><button class="key" data-v="ln(">ln</button><button class="key" data-v="!">x!</button><button class="key" data-v="%">%</button><button class="key operator" data-v="+">+</button>
+<button class="key number" data-v="7">7</button><button class="key number" data-v="8">8</button><button class="key number" data-v="9">9</button><button class="key" data-v="pi">π</button><button class="key" data-v="e">e</button>
+<button class="key number" data-v="4">4</button><button class="key number" data-v="5">5</button><button class="key number" data-v="6">6</button><button class="key" data-v="^2">x²</button><button class="key" data-v="abs(">abs</button>
+<button class="key number" data-v="1">1</button><button class="key number" data-v="2">2</button><button class="key number" data-v="3">3</button><button class="key number" data-v=".">.</button><button class="key equal" data-v="=">=</button>
+<button class="key number" data-v="0">0</button><button class="key number" data-v="00">00</button><button class="key number" data-v="Ans">Ans</button><button class="key number" data-v="EXP">EXP</button><button class="key number" data-v="±">±</button>
+</div>
+<footer>Compatible con teclado · <a href="./">Volver a To-Do List</a></footer>
+</main>
+<script>
+"use strict";
+let expression = "", answer = 0, degrees = true, justCalculated = false;
+const exprEl = document.getElementById("expression");
+const resultEl = document.getElementById("result");
+const modeEl = document.getElementById("mode");
+const funcs = new Set(["sin","cos","tan","asin","acos","atan","log","ln","sqrt","abs"]);
+function tokenize(text) {
+ const tokens = [];
+ let i = 0;
+ while (i < text.length) {
+  if (/\s/.test(text[i])) {i++;continue;}
+  const number = text.slice(i).match(/^(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?/);
+  if(number){tokens.push({type:"number",value:Number(number[0])});i+=number[0].length;continue;}
+  const name = text.slice(i).match(/^[A-Za-z]+/);
+  if(name){tokens.push({type:"name",value:name[0]});i+=name[0].length;continue;}
+  if("+-*/^()!%".includes(text[i])){tokens.push({type:text[i],value:text[i]});i++;continue;}
+  throw Error("Carácter no válido");
+ }
+ // Multiplicación implícita: 2π, 2(3), π(2), (2)(3).
+ const out = [];
+ for (const t of tokens) {
+  const prev = out[out.length-1];
+  if(prev && (prev.type==="number"||prev.type===")"||prev.type==="!"||prev.type==="%"||(prev.type==="name"&&!funcs.has(prev.value)))
+    && (t.type==="number"&&prev.type!== "number" || t.type==="(" || t.type==="name")
+    && !(prev.type==="name"&&funcs.has(prev.value))) out.push({type:"*",value:"*"});
+  out.push(t);
+ }
+ return out;
+}
+function calculate(text){
+ const tokens=tokenize(text);let pos=0;
+ const peek=()=>tokens[pos]?.type;
+ const consume=()=>tokens[pos++];
+ function factorial(n){if(!Number.isInteger(n)||n<0||n>170)throw Error("Factorial solo de enteros entre 0 y 170");let value=1;for(let j=2;j<=n;j++)value*=j;return value;}
+ function applyFunc(name,n){
+  const radians=degrees?n*Math.PI/180:n;
+  switch(name){
+   case "sin":return Math.sin(radians);
+   case "cos":return Math.cos(radians);
+   case "tan":if(Math.abs(Math.cos(radians))<1e-12)throw Error("Tangente indefinida");return Math.tan(radians);
+   case "asin":return (degrees?180/Math.PI:1)*Math.asin(n);
+   case "acos":return (degrees?180/Math.PI:1)*Math.acos(n);
+   case "atan":return (degrees?180/Math.PI:1)*Math.atan(n);
+   case "log":return Math.log10(n);
+   case "ln":return Math.log(n);
+   case "sqrt":return Math.sqrt(n);
+   case "abs":return Math.abs(n);
+  }
+  throw Error("Función desconocida");
+ }
+ function parse(minBP=0){
+  const first=consume();if(!first)throw Error("Expresión incompleta");
+  let left;
+  if(first.type==="number")left=first.value;
+  else if(first.type==="("){left=parse(0);if(peek()!==")")throw Error("Falta )");consume();}
+  else if(first.type==="+"||first.type==="-"){const v=parse(25);left=first.type==="-"?-v:v;}
+  else if(first.type==="name"){
+   if(first.value==="pi")left=Math.PI;
+   else if(first.value==="e")left=Math.E;
+   else if(first.value==="Ans")left=answer;
+   else if(funcs.has(first.value)){if(peek()!=="(")throw Error("Falta (");consume();const arg=parse(0);if(peek()!==")")throw Error("Falta )");consume();left=applyFunc(first.value,arg);}
+   else throw Error("Nombre desconocido");
+  }else throw Error("Expresión no válida");
+  while(pos<tokens.length){
+   const op=peek();
+   if(op==="!"||op==="%"){
+    if(50<minBP)break;consume();left=op==="!"?factorial(left):left/100;continue;
+   }
+   const binding={"+":[10,11],"-":[10,11],"*":[20,21],"/":[20,21],"^":[30,30]}[op];
+   if(!binding||binding[0]<minBP)break;
+   consume();const right=parse(binding[1]);
+   if(op==="+")left+=right;
+   if(op==="-")left-=right;
+   if(op==="*")left*=right;
+   if(op==="/"){if(right===0)throw Error("No se puede dividir entre cero");left/=right;}
+   if(op==="^")left=Math.pow(left,right);
+  }
+  return left;
+ }
+ const v=parse();if(pos!==tokens.length)throw Error("Expresión no válida");
+ if(!Number.isFinite(v))throw Error("Resultado indefinido");
+ return Math.abs(v)<1e-12?0:v;
+}
+function format(n){return Number.parseFloat(n.toPrecision(12)).toString();}
+function show(){
+ exprEl.textContent=expression.replace(/sqrt/g,"√").replace(/pi/g,"π").replace(/\*/g,"×").replace(/\//g,"÷")||"0";
+ exprEl.scrollLeft=exprEl.scrollWidth;
+ if(!expression){resultEl.textContent="0";return;}
+ try{resultEl.textContent=format(calculate(expression));}
+ catch{resultEl.textContent="…";}
+}
+function act(value){
+ if(value==="AC"){expression="";justCalculated=false;show();return;}
+ if(value==="DEL"){expression=expression.slice(0,-1);justCalculated=false;show();return;}
+ if(value==="="){
+  try{const n=calculate(expression);answer=n;resultEl.textContent=format(n);expression=format(n);exprEl.textContent=expression;justCalculated=true;}
+  catch(e){resultEl.textContent=e.message;}
+  return;
+ }
+ if(value==="±"){expression=expression?"-("+expression+")":"-";justCalculated=false;show();return;}
+ if(value==="EXP"){value="e";} // Constante de Euler; notación científica: introducir ×10^n.
+ if(value==="Ans"){value="Ans";}
+ if(justCalculated && (/^[0-9.]$/.test(value)||value==="00"||value==="pi"||value==="e"||value==="Ans"||value.endsWith("("))){expression="";}
+ justCalculated=false;
+ if(expression.length+value.length>180)return;
+ expression+=value;show();
+}
+document.getElementById("keys").addEventListener("click",e=>{const button=e.target.closest("button[data-v]");if(button)act(button.dataset.v);});
+modeEl.addEventListener("click",()=>{degrees=!degrees;modeEl.textContent=degrees?"DEG":"RAD";show();});
+document.addEventListener("keydown",e=>{
+ if(e.ctrlKey||e.metaKey||e.altKey)return;
+ if(/^[0-9.+\-*/^()%!]$/.test(e.key)){e.preventDefault();act(e.key);}
+ else if(e.key==="Enter"||e.key==="="){e.preventDefault();act("=");}
+ else if(e.key==="Backspace"){e.preventDefault();act("DEL");}
+ else if(e.key==="Escape"){e.preventDefault();act("AC");}
+});
+show();
+</script>
+</body>
+</html>
